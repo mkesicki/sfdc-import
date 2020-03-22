@@ -5,3 +5,9 @@ This is just and excercise (yes too much time during pandemia... ) and be aware 
 This will work only with CSV files with real comma separated files and specified format of madatory header in format:
 - ObjectName.FieldName where there is no relation
 - ObjectName.FieldName.RelatedObjectName where there is a relation
+
+
+#Issues
+- it is BLEAH
+- Logger with files definetly do not work good with threads
+- will work only with comma separated values, this might be configured
