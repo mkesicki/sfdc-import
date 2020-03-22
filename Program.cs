@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using SFDCImport.Logger;
+using SFDCImport.Parser;
+using System.Collections.Generic;
 
 namespace SFDCImport
 {
@@ -43,18 +45,43 @@ namespace SFDCImport
             String ClientSecret = args[1];
             String Username = args[2];
             String Password = args[3];
-            String CSV = args[4];
+            String csv = args[4];
             String LoginUrl = args[5];
 
-            if (!File.Exists(CSV)) {
-                throw new FileNotFoundException("The file was not found!", CSV);
+            if (!File.Exists(csv)) {
+                throw new FileNotFoundException("The file was not found!", csv);
             }
 
-            //create logs 
-            FileLog LogSuccess = new FileLog("logs", "success.md");
-            FileLog LogError = new FileLog("logs", "errors.md");
+            Console.WriteLine("Create logs...");
+            FileLogerr Logger = new FileLogerr("logs");
 
-            LogSuccess.Info("Tests");
+            Console.WriteLine("Parsing file \"{0}\" started...", csv);
+            CSVThread parser = new CSVThread(csv, Logger);
+            parser.Parse();
+            //Console.WriteLine("XXX {0}", parser.RowsParsed);
+            //Dictionary<string, List<string>> fields = parser.GetHeader();
+
+            //foreach (KeyValuePair<string, List<string>> entry in fields)
+            //{
+            //    Console.WriteLine("Object [{0}]: ", entry.Key);
+            //    foreach (string field in entry.Value) {
+            //        Console.WriteLine("field: {0}", field);
+            //    }
+            //}
+
+            //foreach (KeyValuePair<string, List<string>> entry in parser.Relations)
+            //{
+            //    Console.WriteLine("Rel [{0}]: ", entry.Key);
+            //    foreach (string field in entry.Value)
+            //    {
+            //        Console.WriteLine("obj: {0}", field);
+            //    }
+            //}
+
+            //get metadada from saleforce based on header
+
+
+
 
 
             //parse file labels/header ->  class
