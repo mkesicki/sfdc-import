@@ -53,11 +53,14 @@ namespace SFDCImport
             }
 
             Console.WriteLine("Create logs...");
-            FileLogerr Logger = new FileLogerr("logs");
+            FileLogger Logger = new FileLogger("logs");
 
             Console.WriteLine("Parsing file \"{0}\" started...", csv);
             CSVThread parser = new CSVThread(csv, Logger);
             parser.Parse();
+            Logger.Save();
+            
+            
             //Console.WriteLine("XXX {0}", parser.RowsParsed);
             //Dictionary<string, List<string>> fields = parser.GetHeader();
 

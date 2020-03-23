@@ -11,3 +11,5 @@ This will work only with CSV files with real comma separated files and specified
 - it is BLEAH
 - Logger with files definetly do not work good with threads
 - will work only with comma separated values, this might be configured
+- use ReaderWriterLock https://docs.microsoft.com/en-us/dotnet/api/system.threading.readerwriterlock?redirectedfrom=MSDN&view=netframework-4.8
+  instead of copy files per thread

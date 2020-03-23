@@ -85,7 +85,7 @@ namespace SFDCImport.Parser
                 while ( (cpu == Cores - 1 || line < BatchSize) && !sr.EndOfStream)
                 {
                     String message = sr.ReadLine();
-                    //Console.WriteLine(String.Format("cpu#{0} {1} {2}", cpu, message, RowsParsed));
+                    //Console.WriteLine(String.Format("cpu#{0} {1}", cpu, message));
                     Logger.Info(String.Format("cpu#{0}: {1}", cpu, message));
                     line++;
                     StatusBar.Tick();
@@ -100,7 +100,26 @@ namespace SFDCImport.Parser
                 Thread t = new Thread(start);
                 t.Start(i);
                 Threads.Add(t);
-            }           
+            }
+
+            bool loop = true;
+
+            while (loop)
+            {
+                int count = 0;
+                for (int i = 0; i < Cores; i++)
+                {
+                    if (Threads[i].IsAlive == false)
+                    {
+                        count++;
+                    }
+                }
+                if (count == Cores) { loop = false; }
+            }
+
+            StatusBar.Dispose();
+
+            return;
         }
 
         private void PrepareFileToParse() {

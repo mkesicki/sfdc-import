@@ -1,26 +1,26 @@
 ﻿using System;
-using System.Text;
 using System.IO;
+using System.Collections.Concurrent;
 
 namespace SFDCImport.Logger
 {
-    class FileLogerr : ILoggerInterface
+    class FileLogger : ILoggerInterface
     {
-        public FileStream LogSuccess { get; set; }
-        public FileStream LogError { get; set; }
+        public BlockingCollection<LogMessage> _logMessages = new BlockingCollection<LogMessage>();
 
-        private readonly object LogSuccessLock = new object();
-        private readonly object LogErrorLock = new object();
+        public BlockingCollection<LogMessage> _logErrors = new BlockingCollection<LogMessage>();
 
-        public FileLogerr(String Dir)
+        private String PathSuccess, PathError;
+
+        public FileLogger(String Dir)
         {
             if (!Directory.Exists(Dir))
             {
                 Directory.CreateDirectory(Dir);
             }
 
-            String PathSuccess = Dir + System.IO.Path.DirectorySeparatorChar + "success.md";
-            String PathError = Dir + System.IO.Path.DirectorySeparatorChar + "error.md";
+             PathSuccess = Dir + Path.DirectorySeparatorChar + "success.md";
+             PathError = Dir + Path.DirectorySeparatorChar + "error.md";
 
             if (File.Exists(PathSuccess))
             {
@@ -31,12 +31,6 @@ namespace SFDCImport.Logger
             {
                 File.Delete(PathError);
             }
-
-            LogSuccess = File.Create(PathSuccess);
-            LogError = File.Create(PathError);
-
-            Console.WriteLine("Log file: {0} created", PathSuccess);
-            Console.WriteLine("Log file: {0} created", PathError);
         }
 
         public void Info(string message)
@@ -56,10 +50,32 @@ namespace SFDCImport.Logger
             AddError(s);
         }
 
+        private void SaveLog(BlockingCollection<LogMessage> logs) {
+
+           
+            if (0 == logs.Count) {
+                return;
+            }
+
+            LogMessage message = logs.Take();
+
+            Console.WriteLine("Store log: {0}, {1} entries",message.Filepath, logs.Count);
+            File.AppendAllText(message.Filepath, message.Text);
+
+            BlockingCollection<LogMessage> tmp = logs;
+            foreach (LogMessage msg in logs.GetConsumingEnumerable())
+            {
+                File.AppendAllText(msg.Filepath, msg.Text);
+                if (logs.IsCompleted || logs.Count == 0) {
+                    break;
+                } 
+            }
+        }
+
         public void Save()
-        {
-            LogSuccess.Close();
-            LogError.Close();
+        {            
+            SaveLog(_logMessages);
+            SaveLog(_logErrors);
         }
 
         public void Close()
@@ -67,22 +83,24 @@ namespace SFDCImport.Logger
             Save();
         }
 
-        private void AddMessage(String Message) {
-
-            lock (LogSuccessLock)
-            {
-                byte[] info = new UTF8Encoding(true).GetBytes(Message);
-                LogSuccess.Write(info, 0, info.Length);
-            }
+        private void AddMessage(String Message) 
+        {
+            _logMessages.Add(new LogMessage(PathSuccess, Message));
         }
 
         private void AddError(String Message)
         {
-            lock (LogErrorLock)
-            {
-                byte[] info = new UTF8Encoding(true).GetBytes(Message);
-                LogError.Write(info, 0, info.Length);
-            }
+            _logErrors.Add(new LogMessage(PathError, Message));
+        }
+    }
+    public class LogMessage
+    {
+        public string Filepath { get; set; }
+        public string Text { get; set; }
+
+        public LogMessage(String path, String Message) {
+            Filepath = path;
+            Text = Message;
         }
     }
 }
