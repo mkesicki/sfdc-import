@@ -48,11 +48,11 @@ namespace SFDCImport.Parser
 
             this.Path = Path;
 
-            Cores = Environment.ProcessorCount;
+            Cores = 1; // Environment.ProcessorCount;
             CSV = new StreamReader(Path);
             Size = File.ReadLines(Path).Count() - 1; //do not count header file
 
-            Console.WriteLine("Number of rows to parse:  {0}", Size);
+            Console.WriteLine("Number of rows to process:  {0}", Size);
 
             //get Header
             GetHeader();
@@ -76,18 +76,31 @@ namespace SFDCImport.Parser
 
             int cpu = (int)core;
             int line = 0;
+            Dictionary<String, Dictionary<String, String>> payload = new Dictionary<String, Dictionary<String, String>>();
 
             using (StreamReader sr = FilesToParse[cpu])
             {
                 while ( (cpu == Cores - 1 || line < BatchSize) && !sr.EndOfStream)
                 {
                     String message = sr.ReadLine();
+
+                    //split line by column, add to payload, every batch limit size send to SFDC
+
+                    String[] data = message.Split(",");
+
+                    Console.WriteLine(String.Format("cpu#{0} {1}", cpu, message));
+                    SFDC.PreparePayload(Relations, Header, data);
+
                     //Console.WriteLine(String.Format("cpu#{0} {1}", cpu, message));
                     //Logger.Info(String.Format("cpu#{0}: {1}", cpu, message));
                     line++;
                     StatusBar.Tick();
                 }
             }
+
+
+
+            //if payload size > 0 send it 
         }
 
         public void Parse() {
@@ -141,20 +154,22 @@ namespace SFDCImport.Parser
         public Dictionary<String, List<string> > GetHeader()
         {
             String header = CSV.ReadLine();
-            string[] labels = header.Split(','); 
+            string[] labels = header.Split(',');
 
             Columns = labels.ToList<string>();
+            int i = 0;
 
             foreach (String label in labels) {
                 string[] parts = label.Split('.'); // separate object name from field name
+                //Columns.Add(parts[0] + "." + parts[1]);
 
                 List<string> tmp = new List<string>();
                 List<string> relTmp = new List<string>();
 
                 if (parts.Length == 3 && !Relations.ContainsKey(parts[2])) {
-
                     relTmp.Add(parts[0]);
                     Relations[parts[2]] = relTmp;
+                    Console.WriteLine("Skip column {0}", i);
                 }
 
                 if (Header.ContainsKey(parts[0])) {
@@ -163,18 +178,15 @@ namespace SFDCImport.Parser
 
                 tmp.Add(parts[1]);
                 Header[parts[0]] = tmp;
+                i++;
             }
 
-            //foreach (string x in Columns) { Console.WriteLine("column: {0}", x); }
-
+            foreach (string x in Columns) { Console.WriteLine("column: {0}", x); }
 
             //get Metadata for salesforce objects
             foreach (var key in Header.Keys) {
                 SFDC.RetrieveMetadata(key.ToString());
             }
-
-
-
 
             return Header;
         }
