@@ -9,7 +9,8 @@ using System.Threading;
 
 namespace SFDCImport.Parser
 {
-    class CSVThread : IParserInterface
+    class CSVThread : 
+        IParserInterface
     {
         public Dictionary<string, string> Row { get; set; }
         public Dictionary<string, List<string> > Header { get; set; }
@@ -20,22 +21,17 @@ namespace SFDCImport.Parser
         public int Error { get; set; }
         public string Path { get; set; }
         private int Cores { get; set; }
-
         private ProgressBar StatusBar { get; set; }
-
         public int Size { get; set; }
-
         public int BatchSize { get; set; }
-
         private StreamReader CSV { get; set; }
-
         private List<StreamReader> FilesToParse { get; set; }
-
         private ILoggerInterface Logger { get; set; }
 
         private List<Thread> Threads = new List<Thread>();
+        private Salesforce.Salesforce SFDC { get; set; }
 
-        public CSVThread(String Path, ILoggerInterface Logger)
+        public CSVThread(String Path, ILoggerInterface Logger, Salesforce.Salesforce Sfdc)
         {
             Header = new Dictionary<string, List<string> >();
             Columns = new List<string>();
@@ -43,6 +39,7 @@ namespace SFDCImport.Parser
             Relations = new Dictionary<string, List<string>>();
 
             this.Logger = Logger;
+            this.SFDC = Sfdc;
 
             if (!File.Exists(Path))
             {
@@ -55,7 +52,7 @@ namespace SFDCImport.Parser
             CSV = new StreamReader(Path);
             Size = File.ReadLines(Path).Count() - 1; //do not count header file
 
-            Console.WriteLine("Number of lines to parse:  {0}", Size);
+            Console.WriteLine("Number of rows to parse:  {0}", Size);
 
             //get Header
             GetHeader();
@@ -86,7 +83,7 @@ namespace SFDCImport.Parser
                 {
                     String message = sr.ReadLine();
                     //Console.WriteLine(String.Format("cpu#{0} {1}", cpu, message));
-                    Logger.Info(String.Format("cpu#{0}: {1}", cpu, message));
+                    //Logger.Info(String.Format("cpu#{0}: {1}", cpu, message));
                     line++;
                     StatusBar.Tick();
                 }
@@ -168,7 +165,16 @@ namespace SFDCImport.Parser
                 Header[parts[0]] = tmp;
             }
 
-            foreach (string x in Columns) { Console.WriteLine("column: {0}", x); }
+            //foreach (string x in Columns) { Console.WriteLine("column: {0}", x); }
+
+
+            //get Metadata for salesforce objects
+            foreach (var key in Header.Keys) {
+                SFDC.RetrieveMetadata(key.ToString());
+            }
+
+
+
 
             return Header;
         }
@@ -184,7 +190,6 @@ namespace SFDCImport.Parser
 
                 int startLine = (i * BatchSize) + 1;
                 int readed = 0;
-                Console.WriteLine(i + "#start line: " + startLine);
 
                 StreamReader sr = FilesToParse[i];
                 while (readed < startLine)
