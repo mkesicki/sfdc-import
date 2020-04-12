@@ -242,7 +242,9 @@ namespace SFDCImport.Salesforce
         {
             return new Record
             {
-                children = new Dictionary<string, SalesforceBody>()
+                children = new Dictionary<string, SalesforceBody>(),
+                fields = new Dictionary<string, object>(),
+                attributes = new Dictionary<string, string>()
             };
         }
 
@@ -254,7 +256,7 @@ namespace SFDCImport.Salesforce
             var propertyInfos = value.GetType().GetProperties();
             foreach (var propertyInfo in propertyInfos)
             {
-                // Skip the children property.
+                // Skip the children & fields property.
                 if (propertyInfo.Name == "children" || propertyInfo.Name == "fields")
                     continue;
 
