@@ -5,6 +5,9 @@ using RestSharp;
 using System.Net;
 using System.Security.Authentication;
 using SFDCImport.Model;
+using Newtonsoft.Json;
+//using System.Text.Json;
+//using System.Text.Json.Serialization;
 
 namespace SFDCImport.Salesforce
 {
@@ -93,6 +96,27 @@ namespace SFDCImport.Salesforce
             throw new ApplicationException("Error getting object Metadata");
         }
 
+        public void PrintPayload(List<ObjectPayload> Payload)
+        {
+
+            foreach (ObjectPayload obj in Payload)
+            {
+                Console.WriteLine("payload object {0}", obj.Name);
+                foreach (KeyValuePair<string, object> entry in obj.Fields)
+                {
+                    Console.WriteLine("field  {0} : {1}: ref {2}", entry.Key, entry.Value, obj.Reference);
+                    foreach (var child in obj.Children)
+                    {
+                        Console.WriteLine("Child object: {0}", child.Name);
+                        foreach (KeyValuePair<string, object> field in child.Fields)
+                        {
+                            Console.WriteLine("field  {0} : {1}: ref {2}", field.Key, field.Value.ToString(), child.Reference);
+                        }
+                    }
+                }
+            }
+        }
+
         public void PreparePayload(Dictionary<string, List<string>> Relations, Dictionary<string, List<string>> Header, String[] data) {
 
             int referenceNumber = Payload.Count + 1;
@@ -101,8 +125,8 @@ namespace SFDCImport.Salesforce
             int i = 0;
             foreach (KeyValuePair<string, List<String>> entry in Header)
             {
-
-                Dictionary<String, String> fields = new Dictionary<String, String>();
+                
+                Dictionary<String, object> fields = new Dictionary<String, object>();
                 
                 foreach (String column in entry.Value)
                 {
@@ -124,7 +148,6 @@ namespace SFDCImport.Salesforce
                 ); 
             }
             else {
-
                 foreach (ObjectPayload body in Children) {
 
                     Payload.Add(
@@ -134,66 +157,93 @@ namespace SFDCImport.Salesforce
             }
 
             PrintPayload(Payload);
-
-            
+            PushData(Relations, Payload);
         }
 
-        public void PushData(Dictionary<string, List<string>> Relation, List<ObjectPayload> Payload) {
-
-            //int i = 1;
-            //foreach (KeyValuePair<string, List<String>> relation in Relation) { 
-
-            //    foreach()
-                
-            //}
-        }
-
-
-        public void PrintPayload(List<ObjectPayload> Payload) {
-           
-            foreach (ObjectPayload obj in Payload)
+        public void PushData(Dictionary<string, List<string>> Relation, List<ObjectPayload> Payload)
+        {
+            List<Record> records = new List<Record>();
+            SalesforceBody body = new SalesforceBody();
+            foreach (ObjectPayload PayloadObject in Payload)
             {
+                Dictionary<string, string> Attributes = new Dictionary<string, string>();
+                Attributes.Add("type", PayloadObject.Name);
+                Attributes.Add("referenceId", "ref" + PayloadObject.Reference);
 
-                Console.WriteLine("payload object {0}", obj.Name);
-                foreach (KeyValuePair<string, String> entry in obj.Fields)
+                Dictionary<string, SalesforceBody> children = new Dictionary<string,SalesforceBody>();
+                List<Record> childrenObjects;
+
+                Boolean isChildExists = false;
+
+                foreach (ObjectPayload Child in PayloadObject.Children)
                 {
-                    Console.WriteLine("field  {0} : {1}: ref {2}", entry.Key, entry.Value, obj.Reference);
-                    foreach (var child in obj.Children)
-                    {
-                        Console.WriteLine("Child object: {0}", child.Name);
-                        foreach (KeyValuePair<string, String> field in child.Fields)
-                        {
-                            Console.WriteLine("field  {0} : {1}: ref {2}", field.Key, field.Value, child.Reference);
+                    String keyName = Child.Name; //get name from metadata
 
-                        }
+                    if (children.ContainsKey(keyName)) {
+                        childrenObjects = children[keyName].records;
+                        isChildExists = true;
+                    } else {
+                        childrenObjects = new List<Record>();
+                    };
+
+                    Dictionary<string, string> ChildAttributes = new Dictionary<string, string>();
+                    
+                    ChildAttributes.Add("type", Child.Name);
+                    ChildAttributes.Add("referenceId", "ref" + Child.Reference);
+
+                    //childrenObjects.Add(new Record { attributes = ChildAttributes, fields = Child.Fields });
+                    if (childrenObjects.Count == 0)
+                    {
+                        childrenObjects.Add(new Record { attributes = ChildAttributes, fields = Child.Fields });
+                    }
+                    else {
+                        childrenObjects.Add(new Record { fields = Child.Fields });
+                    }
+
+                    if (!isChildExists)
+                    {
+                        children.Add(keyName, new SalesforceBody { records = childrenObjects });
+                    }
+                    else {
+                        children[keyName].records = childrenObjects;
                     }
                 }
+
+                records.Add(
+                    new Record { attributes = Attributes, fields = PayloadObject.Fields, children = children }
+                );
+
+                body.records = records;
+                String jsonBody = JsonConvert.SerializeObject(body);
+                //String jsonString = JsonSerializer.Serialize(body);
+                Console.WriteLine("Salesforce payload: {0}", jsonBody);
             }
         }
     }
 
     public class ObjectPayload {
-
         public String Name { get; set; }
-        public Dictionary<string, string> Fields { get; set; }
+        public Dictionary<string, object> Fields { get; set; }
         public int Reference {get; set;}
         public List<ObjectPayload> Children { get; set; }
-
     }
 
-    public class Record {
+    public class Record
+    {
+        public Dictionary<string, string> attributes { get; set; }
 
-        Dictionary<String, string> attributes { get; set; }
+        [JsonExtensionData]
+        public Dictionary<String, object> fields { get; set; }
 
-        Dictionary<String, string> fields { get; set; }
-
-        Dictionary<string, List<Record>> relations { get; set; }
-
+        //[JsonExtensionData]
+        [JsonProperty(NullValueHandling= NullValueHandling.Ignore)]
+        public Dictionary<string, SalesforceBody> children { get; set; }
+        //public Dictionary<string, string> children { get; set; }
     }
 
-    public class JsonBody { 
-
-        List<Record> records { get; set; }
-
+    public class SalesforceBody
+    {
+        public List<Record> records { get; set; }
     }
 }
+
