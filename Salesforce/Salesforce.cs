@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using RestSharp;
 using System.Net;
 using System.Security.Authentication;
 using SFDCImport.Model;
 using Newtonsoft.Json;
-//using System.Text.Json;
-//using System.Text.Json.Serialization;
+using Newtonsoft.Json.Converters;
 
 namespace SFDCImport.Salesforce
 {
@@ -84,8 +82,6 @@ namespace SFDCImport.Salesforce
 
             if (HttpStatusCode.OK == response.StatusCode)
             {
-                //Console.WriteLine("Metadata for {0} : {1}", ObjectName, response.Content.ToString());
-
                 RestSharp.Serialization.Json.JsonDeserializer deserializer = new RestSharp.Serialization.Json.JsonDeserializer();
                 Metadata desc = deserializer.Deserialize<Metadata>(response);
                 Meta.Add(ObjectName, desc);
@@ -170,7 +166,7 @@ namespace SFDCImport.Salesforce
                 Attributes.Add("type", PayloadObject.Name);
                 Attributes.Add("referenceId", "ref" + PayloadObject.Reference);
 
-                Dictionary<string, SalesforceBody> children = new Dictionary<string,SalesforceBody>();
+                Dictionary<string, SalesforceBody> children = new Dictionary<string, SalesforceBody>();
                 List<Record> childrenObjects;
 
                 Boolean isChildExists = false;
@@ -191,7 +187,6 @@ namespace SFDCImport.Salesforce
                     ChildAttributes.Add("type", Child.Name);
                     ChildAttributes.Add("referenceId", "ref" + Child.Reference);
 
-                    //childrenObjects.Add(new Record { attributes = ChildAttributes, fields = Child.Fields });
                     if (childrenObjects.Count == 0)
                     {
                         childrenObjects.Add(new Record { attributes = ChildAttributes, fields = Child.Fields });
@@ -214,8 +209,7 @@ namespace SFDCImport.Salesforce
                 );
 
                 body.records = records;
-                String jsonBody = JsonConvert.SerializeObject(body);
-                //String jsonString = JsonSerializer.Serialize(body);
+                string jsonBody = JsonConvert.SerializeObject(body, Formatting.None, new RecordObjectConverter());
                 Console.WriteLine("Salesforce payload: {0}", jsonBody);
             }
         }
@@ -232,18 +226,69 @@ namespace SFDCImport.Salesforce
     {
         public Dictionary<string, string> attributes { get; set; }
 
-        [JsonExtensionData]
         public Dictionary<String, object> fields { get; set; }
 
-        //[JsonExtensionData]
-        [JsonProperty(NullValueHandling= NullValueHandling.Ignore)]
         public Dictionary<string, SalesforceBody> children { get; set; }
-        //public Dictionary<string, string> children { get; set; }
     }
 
     public class SalesforceBody
     {
         public List<Record> records { get; set; }
+    }
+
+    internal class RecordObjectConverter : CustomCreationConverter<Record>
+    {
+        public override Record Create(Type objectType)
+        {
+            return new Record
+            {
+                children = new Dictionary<string, SalesforceBody>()
+            };
+        }
+
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            writer.WriteStartObject();
+
+            // Write properties.
+            var propertyInfos = value.GetType().GetProperties();
+            foreach (var propertyInfo in propertyInfos)
+            {
+                // Skip the children property.
+                if (propertyInfo.Name == "children" || propertyInfo.Name == "fields")
+                    continue;
+
+                writer.WritePropertyName(propertyInfo.Name);
+                var propertyValue = propertyInfo.GetValue(value);
+                serializer.Serialize(writer, propertyValue);
+            }
+
+            // Write dictionary key-value pairs.
+            var record = (Record)value;
+            if (record.children != null)
+            {
+                foreach (var kvp in record.children)
+                {
+                    writer.WritePropertyName(kvp.Key);
+                    serializer.Serialize(writer, kvp.Value);
+                }
+            }
+
+            if (record.fields != null)
+            {
+                foreach (var kvp in record.fields)
+                {
+                    writer.WritePropertyName(kvp.Key);
+                    serializer.Serialize(writer, kvp.Value);
+                }
+            }
+            writer.WriteEndObject();
+        }
+        public override bool CanWrite
+        {
+            get { return true; }
+        }
+
     }
 }
 
