@@ -12,10 +12,10 @@ using SFDCImport.Response;
 
 namespace SFDCImport.Salesforce
 {
-    class Salesforce
+    class Salesforce : ICloneable
     {
         private readonly String ApiVersion = "v48.0"; //yeah, config variable
-        private readonly int BatchSize = 200; // as above
+        private readonly int BatchSize = 100; // 100 for 1 parent and one child object this should be set during runtime -> the rule looks like 200 / number of child objects
         private String Token { get; set; }
         private String ClientId { get; set; }
         private String ClientSecret { get; set; }
@@ -32,6 +32,14 @@ namespace SFDCImport.Salesforce
         private SalesforceBody body = new SalesforceBody();
 
         private String ObjectName;
+
+        public virtual object Clone()
+        {
+            Salesforce clone = new Salesforce(ClientId, ClientSecret, Username, Password, LoginUrl, Logger);
+            clone.Meta = this.Meta;
+
+            return clone;
+        }
 
         public Salesforce(String ClientId, String ClientSecret, String Username, string Password, String LoginUrl, ILoggerInterface Logger)
         {
@@ -122,8 +130,7 @@ namespace SFDCImport.Salesforce
         }
 
         public void PreparePayload(Dictionary<string, List<string>> Relations, Dictionary<string, List<string>> Header, String[] data, int referenceNumber) {
-
-            //int referenceNumber = Payload.Count + 1;
+            //Console.WriteLine("REF#"+referenceNumber);
             List<ObjectPayload> Children = new List<ObjectPayload>();
             ObjectPayload parent = new ObjectPayload();
             //String ObjectName = "";
@@ -167,10 +174,11 @@ namespace SFDCImport.Salesforce
             }
 
             ////PrintPayload(Payload);
-            PushData(Payload);
+            ///
+            if(Payload.Count >= BatchSize) flush();
         }
 
-        public void PushData( List<ObjectPayload> Payload)
+        public void PrepareBody()
         {
             List<Record> records = new List<Record>();
             //SalesforceBody body = new SalesforceBody();
@@ -221,18 +229,19 @@ namespace SFDCImport.Salesforce
 
                 records.Add(
                     new Record { attributes = Attributes, fields = PayloadObject.Fields, children = children }
-                );
+                );                                   
+            }
 
-                body.records = records;
-
-                if (body.records.Count >= BatchSize) flush();
-            }            
-         }
+            body.records = records;
+        }
 
          public void flush()
          {
+            if (Payload.Count == 0) return;
 
-            if (body.records.Count == 0) return;
+            PrepareBody();
+
+            //Console.WriteLine("Flush salesforce data: {0}", body.records.Count);
 
             string jsonBody = JsonConvert.SerializeObject(body, Formatting.None, new RecordObjectConverter());
             //Console.WriteLine("Salesforce payload: {0}", jsonBody);
@@ -248,7 +257,11 @@ namespace SFDCImport.Salesforce
 
             IRestResponse response = Client.Execute(request);
 
+            body = new SalesforceBody();
+            Payload = new List<ObjectPayload>();
+
             //Console.WriteLine(response.Content);
+            //Environment.Exit(0);
 
             RestSharp.Serialization.Json.JsonDeserializer deserializer = new RestSharp.Serialization.Json.JsonDeserializer();
 
@@ -259,7 +272,6 @@ namespace SFDCImport.Salesforce
                 {
                     Logger.Info(String.Format("Object Reference: {0} added with id: {1}", result.referenceId, result.id));
                 }
-
             }
             else if (HttpStatusCode.BadRequest == response.StatusCode)
             {

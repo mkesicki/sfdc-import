@@ -31,18 +31,21 @@ namespace SFDCImport.Parser
         private Dictionary<int, int> startLine { get; set; }
 
         private List<Thread> Threads = new List<Thread>();
-        private Salesforce.Salesforce SFDC { get; set; }
+        private List<Salesforce.Salesforce> sfdcs { get; set; }
 
         public CSVThread(String Path, ILoggerInterface Logger, Salesforce.Salesforce Sfdc)
         {
+            Cores = Environment.ProcessorCount;
             Header = new Dictionary<string, List<string> >();
+            Columns = new List<string>();
             Columns = new List<string>();
             Row = new Dictionary<string, string>();
             Relations = new Dictionary<string, List<string>>();
             startLine = new Dictionary<int, int>();
+            sfdcs = new List<Salesforce.Salesforce>();
 
             this.Logger = Logger;
-            this.SFDC = Sfdc;
+            sfdcs.Add(Sfdc);
 
             if (!File.Exists(Path))
             {
@@ -50,8 +53,7 @@ namespace SFDCImport.Parser
             }
 
             this.Path = Path;
-
-            Cores = 1; // Environment.ProcessorCount;
+            
             CSV = new StreamReader(Path);
             Size = File.ReadLines(Path).Count() - 1; //do not count header file
 
@@ -59,6 +61,13 @@ namespace SFDCImport.Parser
 
             //get Header
             GetHeader();
+
+            //clone salesforce instances
+            for (int i = 0; i < Cores - 1; i++)
+            {
+                sfdcs.Add((Salesforce.Salesforce)Sfdc.Clone());
+            }
+
 
             //prepare progress bar
             var options = new ProgressBarOptions
@@ -92,21 +101,13 @@ namespace SFDCImport.Parser
                     String[] data = message.Split(",");
 
                     //Console.WriteLine(String.Format("cpu#{0} {1}", cpu, message));
-                    SFDC.PreparePayload(Relations, Header, data, line  + this.startLine[cpu]);
+                    sfdcs[cpu].PreparePayload(Relations, Header, data, line + this.startLine[cpu]);
 
-                    //Console.WriteLine(String.Format("cpu#{0} {1}", cpu, message));
                     //Logger.Info(String.Format("cpu#{0}: {1}", cpu, message));
                     line++;
                     StatusBar.Tick();
                 }
-
-                //sfdc flush
-                SFDC.flush();
             }
-
-
-
-            //if payload size > 0 send it 
         }
 
         public void Parse() {
@@ -127,6 +128,7 @@ namespace SFDCImport.Parser
                 {
                     if (Threads[i].IsAlive == false)
                     {
+                        sfdcs[i].flush();
                         count++;
                     }
                 }
@@ -190,8 +192,11 @@ namespace SFDCImport.Parser
             //foreach (string x in Columns) { Console.WriteLine("column: {0}", x); }
 
             //get Metadata for salesforce objects
-            foreach (var key in Header.Keys) {
-                SFDC.RetrieveMetadata(key.ToString());
+           
+                
+            foreach (var key in Header.Keys)
+            {
+                sfdcs[0].RetrieveMetadata(key.ToString());
             }
 
             return Header;
