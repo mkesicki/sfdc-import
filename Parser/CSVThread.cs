@@ -44,7 +44,6 @@ namespace SFDCImport.Parser
             sfdcs = new List<Salesforce.Salesforce>();
 
             this.Logger = Logger;
-            sfdcs.Add(Sfdc);
 
             if (!File.Exists(Path))
             {
@@ -59,14 +58,16 @@ namespace SFDCImport.Parser
             Console.WriteLine("Number of rows to process:  {0}", Size);
 
             //get Header
+            sfdcs.Add(Sfdc);
             GetHeader();
+
+            sfdcs[0].BatchSize = Sfdc.BatchSize = Relations.Count; //configure batch size according to number of relations
 
             //clone salesforce instances
             for (int i = 0; i < Cores - 1; i++)
             {
                 sfdcs.Add((Salesforce.Salesforce)Sfdc.Clone());
             }
-
 
             //prepare progress bar
             var options = new ProgressBarOptions

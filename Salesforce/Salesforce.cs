@@ -15,7 +15,14 @@ namespace SFDCImport.Salesforce
     class Salesforce : ICloneable
     {
         private readonly String ApiVersion = "v48.0"; //yeah, config variable
-        private readonly int BatchSize = 100; // 100 for 1 parent and one child object this should be set during runtime -> the rule looks like 200 / number of child objects
+
+        private int _batchSize = 100;
+
+        public int BatchSize {
+            get {return _batchSize; }
+            set { _batchSize = (int)(200/(value+1));}
+        }
+
         private String Token { get; set; }
         private String ClientId { get; set; }
         private String ClientSecret { get; set; }
@@ -37,6 +44,7 @@ namespace SFDCImport.Salesforce
         {
             Salesforce clone = new Salesforce(ClientId, ClientSecret, Username, Password, LoginUrl, Logger);
             clone.Meta = this.Meta;
+            clone._batchSize = this._batchSize;
 
             return clone;
         }
