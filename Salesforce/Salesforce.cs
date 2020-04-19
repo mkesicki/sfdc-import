@@ -11,8 +11,8 @@ namespace SFDCImport.Salesforce
 {
     class Salesforce
     {
-        private readonly String ApiVersion = "v48.0";
-        private readonly int BatchSize = 200;
+        private readonly String ApiVersion = "v48.0"; //yeah, config variable
+        private readonly int BatchSize = 200; // as above
         private String Token { get; set; }
         private String ClientId { get; set; }
         private String ClientSecret { get; set; }
@@ -94,7 +94,6 @@ namespace SFDCImport.Salesforce
 
         public void PrintPayload(List<ObjectPayload> Payload)
         {
-
             foreach (ObjectPayload obj in Payload)
             {
                 Console.WriteLine("payload object {0}", obj.Name);
@@ -118,10 +117,10 @@ namespace SFDCImport.Salesforce
             int referenceNumber = Payload.Count + 1;
             List<ObjectPayload> Children = new List<ObjectPayload>();
             ObjectPayload parent = new ObjectPayload();
+            String ObjectName = "";
             int i = 0;
             foreach (KeyValuePair<string, List<String>> entry in Header)
             {
-                
                 Dictionary<String, object> fields = new Dictionary<String, object>();
                 
                 foreach (String column in entry.Value)
@@ -131,21 +130,27 @@ namespace SFDCImport.Salesforce
                 }
 
                 if (Relations.ContainsKey(entry.Key)) {
-                    parent = new ObjectPayload { Name = entry.Key, Fields = fields, Reference = referenceNumber };
+                    parent = new ObjectPayload { Name = entry.Key, Fields = fields, Reference = entry.Key + referenceNumber.ToString() };
                 } else {
-                    Children.Add(new ObjectPayload { Name = entry.Key, Fields = fields, Reference = referenceNumber });
+                    Children.Add(new ObjectPayload { Name = entry.Key, Fields = fields, Reference = entry.Key + referenceNumber.ToString() });
                 }
             }
 
             if (parent != null)
             {
+                if (String.IsNullOrEmpty(ObjectName))
+                {
+                    ObjectName = parent.Name;
+                }
                 Payload.Add(
                      new ObjectPayload { Name = parent.Name, Fields = parent.Fields, Reference = parent.Reference, Children = Children }
                 ); 
             }
             else {
                 foreach (ObjectPayload body in Children) {
-
+                    if (String.IsNullOrEmpty(ObjectName)) {
+                        ObjectName = body.Name;
+                    }
                     Payload.Add(
                      new ObjectPayload { Name = body.Name, Fields = body.Fields, Reference = body.Reference }
                 );
@@ -153,10 +158,10 @@ namespace SFDCImport.Salesforce
             }
 
             PrintPayload(Payload);
-            PushData(Relations, Payload);
+            PushData(ObjectName, Payload);
         }
 
-        public void PushData(Dictionary<string, List<string>> Relation, List<ObjectPayload> Payload)
+        public void PushData(String ObjectName, List<ObjectPayload> Payload)
         {
             List<Record> records = new List<Record>();
             SalesforceBody body = new SalesforceBody();
@@ -170,10 +175,11 @@ namespace SFDCImport.Salesforce
                 List<Record> childrenObjects;
 
                 Boolean isChildExists = false;
+                Metadata parentMetadata = Meta[PayloadObject.Name];
 
                 foreach (ObjectPayload Child in PayloadObject.Children)
                 {
-                    String keyName = Child.Name; //get name from metadata
+                    String keyName = FindRelationName(parentMetadata, Child.Name);
 
                     if (children.ContainsKey(keyName)) {
                         childrenObjects = children[keyName].records;
@@ -211,14 +217,46 @@ namespace SFDCImport.Salesforce
                 body.records = records;
                 string jsonBody = JsonConvert.SerializeObject(body, Formatting.None, new RecordObjectConverter());
                 Console.WriteLine("Salesforce payload: {0}", jsonBody);
+
+                String Url = InstanceUrl + "/services/data/" + ApiVersion + "/composite/tree/" + ObjectName;
+                Console.WriteLine("Send data to Salesforce :" + Url);
+
+                RestRequest request = new RestRequest(Url, Method.POST);
+                request.AddHeader("Authorization", Token);
+                request.AddHeader("Content-Type", "application/json");
+
+                request.AddJsonBody(jsonBody);
+
+                IRestResponse response = Client.Execute(request);
+
+                Console.WriteLine(response.Content);
+
+                //if (HttpStatusCode.OK == response.StatusCode)
+
+
+
+
             }
+        }
+
+        private String FindRelationName(Metadata Meta, String Name) {
+            String relationName = "";
+
+            foreach(ChildRelationship relationship in Meta.childRelationships)
+            {
+                if (relationship.childSObject.Equals(Name)) {
+                    return relationship.relationshipName;
+                }
+            }
+
+            return relationName;
         }
     }
 
     public class ObjectPayload {
         public String Name { get; set; }
         public Dictionary<string, object> Fields { get; set; }
-        public int Reference {get; set;}
+        public string Reference {get; set;}
         public List<ObjectPayload> Children { get; set; }
     }
 
