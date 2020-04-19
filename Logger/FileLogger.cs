@@ -1,6 +1,6 @@
 ﻿using System;
-using System.IO;
 using System.Collections.Concurrent;
+using System.IO;
 
 namespace SFDCImport.Logger
 {
@@ -19,8 +19,8 @@ namespace SFDCImport.Logger
                 Directory.CreateDirectory(Dir);
             }
 
-             PathSuccess = Dir + Path.DirectorySeparatorChar + "success.md";
-             PathError = Dir + Path.DirectorySeparatorChar + "error.md";
+            PathSuccess = Dir + Path.DirectorySeparatorChar + "success.md";
+            PathError = Dir + Path.DirectorySeparatorChar + "error.md";
 
             if (File.Exists(PathSuccess))
             {
@@ -50,9 +50,11 @@ namespace SFDCImport.Logger
             AddError(s);
         }
 
-        private void SaveLog(BlockingCollection<LogMessage> logs) {
+        private void SaveLog(BlockingCollection<LogMessage> logs)
+        {
 
-            if (0 == logs.Count) {
+            if (0 == logs.Count)
+            {
                 return;
             }
 
@@ -60,14 +62,15 @@ namespace SFDCImport.Logger
             foreach (LogMessage msg in logs.GetConsumingEnumerable())
             {
                 File.AppendAllText(msg.Filepath, msg.Text);
-                if (logs.IsCompleted || logs.Count == 0) {
+                if (logs.IsCompleted || logs.Count == 0)
+                {
                     break;
-                } 
+                }
             }
         }
 
         public void Save()
-        {            
+        {
             SaveLog(_logMessages);
             SaveLog(_logErrors);
         }
@@ -77,7 +80,7 @@ namespace SFDCImport.Logger
             Save();
         }
 
-        private void AddMessage(String Message) 
+        private void AddMessage(String Message)
         {
             _logMessages.Add(new LogMessage(PathSuccess, Message));
         }
@@ -92,7 +95,8 @@ namespace SFDCImport.Logger
         public string Filepath { get; set; }
         public string Text { get; set; }
 
-        public LogMessage(String path, String Message) {
+        public LogMessage(String path, String Message)
+        {
             Filepath = path;
             Text = Message;
         }

@@ -1,13 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using RestSharp;
+using SFDCImport.Logger;
+using SFDCImport.Model;
+using SFDCImport.Response;
+using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Security.Authentication;
-using SFDCImport.Model;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using SFDCImport.Logger;
-using SFDCImport.Response;
 
 
 namespace SFDCImport.Salesforce
@@ -56,7 +56,8 @@ namespace SFDCImport.Salesforce
             Login();
         }
 
-        public void Login() {
+        public void Login()
+        {
 
             Console.WriteLine("Login to salesforce: " + LoginUrl);
 
@@ -88,7 +89,8 @@ namespace SFDCImport.Salesforce
             throw new AuthenticationException("Login error");
         }
 
-        public void RetrieveMetadata(String ObjectName) {
+        public void RetrieveMetadata(String ObjectName)
+        {
 
             Console.WriteLine("Get metadata for {0}", ObjectName);
 
@@ -129,7 +131,8 @@ namespace SFDCImport.Salesforce
             }
         }
 
-        public void PreparePayload(Dictionary<string, List<string>> Relations, Dictionary<string, List<string>> Header, String[] data, int referenceNumber) {
+        public void PreparePayload(Dictionary<string, List<string>> Relations, Dictionary<string, List<string>> Header, String[] data, int referenceNumber)
+        {
             //Console.WriteLine("REF#"+referenceNumber);
             List<ObjectPayload> Children = new List<ObjectPayload>();
             ObjectPayload parent = new ObjectPayload();
@@ -138,16 +141,19 @@ namespace SFDCImport.Salesforce
             foreach (KeyValuePair<string, List<String>> entry in Header)
             {
                 Dictionary<String, object> fields = new Dictionary<String, object>();
-                
+
                 foreach (String column in entry.Value)
                 {
                     fields.Add(column, data[i]);
                     i++;
                 }
 
-                if (Relations.ContainsKey(entry.Key)) {
+                if (Relations.ContainsKey(entry.Key))
+                {
                     parent = new ObjectPayload { Name = entry.Key, Fields = fields, Reference = entry.Key + referenceNumber.ToString() };
-                } else {
+                }
+                else
+                {
                     Children.Add(new ObjectPayload { Name = entry.Key, Fields = fields, Reference = entry.Key + referenceNumber.ToString() });
                 }
             }
@@ -160,11 +166,14 @@ namespace SFDCImport.Salesforce
                 }
                 Payload.Add(
                      new ObjectPayload { Name = parent.Name, Fields = parent.Fields, Reference = parent.Reference, Children = Children }
-                ); 
+                );
             }
-            else {
-                foreach (ObjectPayload body in Children) {
-                    if (String.IsNullOrEmpty(this.ObjectName)) {
+            else
+            {
+                foreach (ObjectPayload body in Children)
+                {
+                    if (String.IsNullOrEmpty(this.ObjectName))
+                    {
                         this.ObjectName = body.Name;
                     }
                     Payload.Add(
@@ -175,7 +184,7 @@ namespace SFDCImport.Salesforce
 
             ////PrintPayload(Payload);
             ///
-            if(Payload.Count >= BatchSize) flush();
+            if (Payload.Count >= BatchSize) flush();
         }
 
         public void PrepareBody()
@@ -198,15 +207,18 @@ namespace SFDCImport.Salesforce
                 {
                     String keyName = FindRelationName(parentMetadata, Child.Name);
 
-                    if (children.ContainsKey(keyName)) {
+                    if (children.ContainsKey(keyName))
+                    {
                         childrenObjects = children[keyName].records;
                         isChildExists = true;
-                    } else {
+                    }
+                    else
+                    {
                         childrenObjects = new List<Record>();
                     };
 
                     Dictionary<string, string> ChildAttributes = new Dictionary<string, string>();
-                    
+
                     ChildAttributes.Add("type", Child.Name);
                     ChildAttributes.Add("referenceId", "ref" + Child.Reference);
 
@@ -214,7 +226,8 @@ namespace SFDCImport.Salesforce
                     {
                         childrenObjects.Add(new Record { attributes = ChildAttributes, fields = Child.Fields });
                     }
-                    else {
+                    else
+                    {
                         childrenObjects.Add(new Record { fields = Child.Fields });
                     }
 
@@ -222,21 +235,22 @@ namespace SFDCImport.Salesforce
                     {
                         children.Add(keyName, new SalesforceBody { records = childrenObjects });
                     }
-                    else {
+                    else
+                    {
                         children[keyName].records = childrenObjects;
                     }
                 }
 
                 records.Add(
                     new Record { attributes = Attributes, fields = PayloadObject.Fields, children = children }
-                );                                   
+                );
             }
 
             body.records = records;
         }
 
-         public void flush()
-         {
+        public void flush()
+        {
             if (Payload.Count == 0) return;
 
             PrepareBody();
@@ -295,12 +309,14 @@ namespace SFDCImport.Salesforce
             }
         }
 
-        private String FindRelationName(Metadata Meta, String Name) {
+        private String FindRelationName(Metadata Meta, String Name)
+        {
             String relationName = "";
 
-            foreach(ChildRelationship relationship in Meta.childRelationships)
+            foreach (ChildRelationship relationship in Meta.childRelationships)
             {
-                if (relationship.childSObject.Equals(Name)) {
+                if (relationship.childSObject.Equals(Name))
+                {
                     return relationship.relationshipName;
                 }
             }
@@ -309,10 +325,11 @@ namespace SFDCImport.Salesforce
         }
     }
 
-    public class ObjectPayload {
+    public class ObjectPayload
+    {
         public String Name { get; set; }
         public Dictionary<string, object> Fields { get; set; }
-        public string Reference {get; set;}
+        public string Reference { get; set; }
         public List<ObjectPayload> Children { get; set; }
     }
 

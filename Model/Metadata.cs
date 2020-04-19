@@ -1,8 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 
-namespace SFDCImport.Model {
+namespace SFDCImport.Model
+{
 
     public class ChildRelationship
     {

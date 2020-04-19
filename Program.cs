@@ -1,9 +1,7 @@
-﻿using System;
-using System.IO;
-using SFDCImport.Logger;
+﻿using SFDCImport.Logger;
 using SFDCImport.Parser;
-using System.Collections.Generic;
-using SFDCImport.Salesforce;
+using System;
+using System.IO;
 
 namespace SFDCImport
 {
@@ -22,7 +20,8 @@ namespace SFDCImport
              **/
 
             //check number of arguments passed to applicaiton
-            if (args.Length < 6) {
+            if (args.Length < 6)
+            {
                 Console.WriteLine("You dind't pass all necessary parameters");
                 Help();
             }
@@ -30,15 +29,18 @@ namespace SFDCImport
             Console.WriteLine("Ok, let's rock!");
 
             //create necessary directories
-            if (!Directory.Exists("results")) {
+            if (!Directory.Exists("results"))
+            {
                 Directory.CreateDirectory("results");
             }
 
-            if (!Directory.Exists("tmp")) {
+            if (!Directory.Exists("tmp"))
+            {
                 Directory.CreateDirectory("tmp");
             }
 
-            if (!Directory.Exists("logs")) {
+            if (!Directory.Exists("logs"))
+            {
                 Directory.CreateDirectory("logs");
             }
 
@@ -49,7 +51,8 @@ namespace SFDCImport
             String csv = args[4];
             String LoginUrl = args[5];
 
-            if (!File.Exists(csv)) {
+            if (!File.Exists(csv))
+            {
                 throw new FileNotFoundException("The file was not found!", csv);
             }
 
@@ -103,7 +106,8 @@ namespace SFDCImport
             //store logs -> class
         }
 
-        private static void Help() {
+        private static void Help()
+        {
             Console.WriteLine("SFDC Import is a simmple console app to insert objects in Salesforce from CSV file. \n" +
                 "It creates object with realations and is parsing file with threads \n" +
                 "Was creted for learn and fun but the idea of creating parent and child object in one call might \n" +
