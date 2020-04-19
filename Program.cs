@@ -56,13 +56,13 @@ namespace SFDCImport
             Console.WriteLine("Create logs...");
             FileLogger Logger = new FileLogger("logs");
 
-            Salesforce.Salesforce SFDC = new Salesforce.Salesforce(ClientID, ClientSecret, Username, Password, LoginUrl);
+            Salesforce.Salesforce SFDC = new Salesforce.Salesforce(ClientID, ClientSecret, Username, Password, LoginUrl, Logger);
 
             Console.WriteLine("Parsing file \"{0}\" started...", csv);
             CSVThread parser = new CSVThread(csv, Logger, SFDC);
             parser.Parse();
 
-            //Logger.Save();
+            Logger.Save();
 
 
             //Console.WriteLine("XXX {0}", parser.RowsParsed);

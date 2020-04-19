@@ -6,6 +6,9 @@ using System.Security.Authentication;
 using SFDCImport.Model;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using SFDCImport.Logger;
+using SFDCImport.Response;
+
 
 namespace SFDCImport.Salesforce
 {
@@ -24,14 +27,20 @@ namespace SFDCImport.Salesforce
 
         private Dictionary<String, Metadata> Meta { get; set; }
         RestClient Client;
+        private ILoggerInterface Logger { get; set; }
 
-        public Salesforce(String ClientId, String ClientSecret, String Username, string Password, String LoginUrl)
+        private SalesforceBody body = new SalesforceBody();
+
+        private String ObjectName;
+
+        public Salesforce(String ClientId, String ClientSecret, String Username, string Password, String LoginUrl, ILoggerInterface Logger)
         {
             this.ClientId = ClientId;
             this.ClientSecret = ClientSecret;
             this.Username = Username;
             this.Password = Password;
             this.LoginUrl = LoginUrl;
+            this.Logger = Logger;
 
             Meta = new Dictionary<String, Metadata>();
             Payload = new List<ObjectPayload>();
@@ -112,12 +121,12 @@ namespace SFDCImport.Salesforce
             }
         }
 
-        public void PreparePayload(Dictionary<string, List<string>> Relations, Dictionary<string, List<string>> Header, String[] data) {
+        public void PreparePayload(Dictionary<string, List<string>> Relations, Dictionary<string, List<string>> Header, String[] data, int referenceNumber) {
 
-            int referenceNumber = Payload.Count + 1;
+            //int referenceNumber = Payload.Count + 1;
             List<ObjectPayload> Children = new List<ObjectPayload>();
             ObjectPayload parent = new ObjectPayload();
-            String ObjectName = "";
+            //String ObjectName = "";
             int i = 0;
             foreach (KeyValuePair<string, List<String>> entry in Header)
             {
@@ -138,9 +147,9 @@ namespace SFDCImport.Salesforce
 
             if (parent != null)
             {
-                if (String.IsNullOrEmpty(ObjectName))
+                if (String.IsNullOrEmpty(this.ObjectName))
                 {
-                    ObjectName = parent.Name;
+                    this.ObjectName = parent.Name;
                 }
                 Payload.Add(
                      new ObjectPayload { Name = parent.Name, Fields = parent.Fields, Reference = parent.Reference, Children = Children }
@@ -148,8 +157,8 @@ namespace SFDCImport.Salesforce
             }
             else {
                 foreach (ObjectPayload body in Children) {
-                    if (String.IsNullOrEmpty(ObjectName)) {
-                        ObjectName = body.Name;
+                    if (String.IsNullOrEmpty(this.ObjectName)) {
+                        this.ObjectName = body.Name;
                     }
                     Payload.Add(
                      new ObjectPayload { Name = body.Name, Fields = body.Fields, Reference = body.Reference }
@@ -157,14 +166,14 @@ namespace SFDCImport.Salesforce
                 }
             }
 
-            PrintPayload(Payload);
-            PushData(ObjectName, Payload);
+            ////PrintPayload(Payload);
+            PushData(Payload);
         }
 
-        public void PushData(String ObjectName, List<ObjectPayload> Payload)
+        public void PushData( List<ObjectPayload> Payload)
         {
             List<Record> records = new List<Record>();
-            SalesforceBody body = new SalesforceBody();
+            //SalesforceBody body = new SalesforceBody();
             foreach (ObjectPayload PayloadObject in Payload)
             {
                 Dictionary<string, string> Attributes = new Dictionary<string, string>();
@@ -215,27 +224,62 @@ namespace SFDCImport.Salesforce
                 );
 
                 body.records = records;
-                string jsonBody = JsonConvert.SerializeObject(body, Formatting.None, new RecordObjectConverter());
-                Console.WriteLine("Salesforce payload: {0}", jsonBody);
 
-                String Url = InstanceUrl + "/services/data/" + ApiVersion + "/composite/tree/" + ObjectName;
-                Console.WriteLine("Send data to Salesforce :" + Url);
+                if (body.records.Count >= BatchSize) flush();
+            }            
+         }
 
-                RestRequest request = new RestRequest(Url, Method.POST);
-                request.AddHeader("Authorization", Token);
-                request.AddHeader("Content-Type", "application/json");
+         public void flush()
+         {
 
-                request.AddJsonBody(jsonBody);
+            if (body.records.Count == 0) return;
 
-                IRestResponse response = Client.Execute(request);
+            string jsonBody = JsonConvert.SerializeObject(body, Formatting.None, new RecordObjectConverter());
+            //Console.WriteLine("Salesforce payload: {0}", jsonBody);
 
-                Console.WriteLine(response.Content);
+            String Url = InstanceUrl + "/services/data/" + ApiVersion + "/composite/tree/" + ObjectName;
+            //Console.WriteLine("Send data to Salesforce :" + Url);
 
-                //if (HttpStatusCode.OK == response.StatusCode)
+            RestRequest request = new RestRequest(Url, Method.POST);
+            request.AddHeader("Authorization", Token);
+            request.AddHeader("Content-Type", "application/json");
 
+            request.AddJsonBody(jsonBody);
 
+            IRestResponse response = Client.Execute(request);
 
+            //Console.WriteLine(response.Content);
 
+            RestSharp.Serialization.Json.JsonDeserializer deserializer = new RestSharp.Serialization.Json.JsonDeserializer();
+
+            if (HttpStatusCode.Created == response.StatusCode)
+            {
+                SuccessResponse results = deserializer.Deserialize<SuccessResponse>(response);
+                foreach (ResultSuccess result in results.results)
+                {
+                    Logger.Info(String.Format("Object Reference: {0} added with id: {1}", result.referenceId, result.id));
+                }
+
+            }
+            else if (HttpStatusCode.BadRequest == response.StatusCode)
+            {
+                ErrorResponse errors = deserializer.Deserialize<ErrorResponse>(response);
+                String message = "";
+                foreach (ResultError result in errors.results)
+                {
+                    message = String.Format("Object Reference: {0} has errors: ", result.referenceId);
+                    foreach (Error error in result.errors)
+                    {
+                        message = message + error.message + " for fiedds [";
+                        foreach (String errorMessage in error.fields)
+                        {
+                            message = message + errorMessage + ",";
+                        }
+                    }
+
+                    message = message.Substring(0, message.Length - 1) + "]";
+                }
+                Logger.Error(message);
             }
         }
 

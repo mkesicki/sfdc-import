@@ -52,17 +52,11 @@ namespace SFDCImport.Logger
 
         private void SaveLog(BlockingCollection<LogMessage> logs) {
 
-           
             if (0 == logs.Count) {
                 return;
             }
 
-            LogMessage message = logs.Take();
-
-            Console.WriteLine("Store log: {0}, {1} entries",message.Filepath, logs.Count);
-            File.AppendAllText(message.Filepath, message.Text);
-
-            BlockingCollection<LogMessage> tmp = logs;
+            Console.WriteLine("Store log: {0} entries", logs.Count);
             foreach (LogMessage msg in logs.GetConsumingEnumerable())
             {
                 File.AppendAllText(msg.Filepath, msg.Text);

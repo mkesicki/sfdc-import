@@ -5,7 +5,7 @@ This is just and excercise (yes too much time during pandemia... ) and be aware 
 This will work only with CSV files with real comma separated files and specified format of madatory header in format:
 - ObjectName.FieldName where there is no relation
 - ObjectName.FieldName.RelatedObjectName where there is a relation (for the related column). Do not insert in CSV file column with relation values like Account ID for contanct child object.
-- Only one level relation will be handled so for example Account (parent) & Opportunity (child) 
+- Only one level relation will be handled so for example Account (parent) & Opportunity (child)
 - There can be only one parent object
 
 #Issues
@@ -14,3 +14,4 @@ This will work only with CSV files with real comma separated files and specified
 - use ReaderWriterLock https://docs.microsoft.com/en-us/dotnet/api/system.threading.readerwriterlock?redirectedfrom=MSDN&view=netframework-4.8
   instead of copy files per thread
 - Improve logs
+
