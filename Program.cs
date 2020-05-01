@@ -108,7 +108,7 @@ namespace SFDCImport
 
         private static void Help()
         {
-            Console.WriteLine("SFDC Import is a simmple console app to insert objects in Salesforce from CSV file. \n" +
+            Console.WriteLine("SFDC Import is a simple console app to insert objects in Salesforce from CSV file. \n" +
                 "It creates object with realations and is parsing file with threads \n" +
                 "Was creted for learn and fun but the idea of creating parent and child object in one call might \n" +
                 "be useful in real case scenarios \n\n" +
